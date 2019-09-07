@@ -1,0 +1,65 @@
+service: urlshortner
+
+custom:
+  stage: ${opt:stage, self:provider.stage}
+
+provider:
+  name: aws
+  runtime: python3.7
+  environment:
+    DDB_TABLE: {Ref: LinksDB}
+  iamRoleStatements:
+    - Action:
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+      Resource:
+        "Fn::Join":
+          - ""
+          -
+            - "arn:aws:dynamodb:"
+            - Ref: "AWS::Region"
+            - ":"
+            - Ref: "AWS::AccountId"
+            - ":table/"
+            - Ref: LinksDB
+      Effect: Allow
+
+functions:
+  main:
+    handler: codes/main.handler
+    events:
+      - http:
+          path: /
+          method: get
+
+  create:
+    handler: codes/create.handler
+    events:
+      - http:
+          path: /
+          method: post
+
+  redirect:
+    handler: codes/redirect.handler
+    events:
+      - http:
+          path: /{slug}
+          method: get
+
+resources:
+  Resources:
+    LinksDB:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+        -
+          AttributeName: "slug"
+          AttributeType: "S"
+        KeySchema:
+        -
+          AttributeName: "slug"
+          KeyType: "HASH"
+        TableName: "${self:custom.stage}_links_table"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
